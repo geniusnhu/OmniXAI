@@ -194,7 +194,7 @@ class IntegratedGradientText(ExplainerBase):
             mode: str = "classification",
             id2token: Dict = None,
             tokenizer: Callable = None,
-            huggingface_model: Bool = False,
+            huggingface_model: bool = False,
             **kwargs,
     ):
         """
