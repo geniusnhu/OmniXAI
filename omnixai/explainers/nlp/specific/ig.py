@@ -289,7 +289,7 @@ class IntegratedGradientText(ExplainerBase):
                         f"should be the same as the number of images in X."
                     )
             else:
-                if huggingface_model:
+                if self.huggingface_model:
                     scores = (
                         self.model(*inputs).logits.detach().cpu().numpy()
                         if self.model_type == "torch"
