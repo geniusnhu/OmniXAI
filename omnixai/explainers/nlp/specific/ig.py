@@ -86,10 +86,7 @@ class _IntegratedGradientTorch:
         return _calculate_integral(self.embeddings[0], baselines[0], gradients)
 
     def _embedding_hook(self, module, inputs, outputs):
-        if self.huggingface_model:
-            self.embeddings = outputs.logits.detach().cpu().numpy()
-        else:
-            self.embeddings = outputs.detach().cpu().numpy()
+        self.embeddings = outputs.detach().cpu().numpy()
 
     def _embedding_layer_hook(self, module, inputs, outputs):
         return self.embedding_layer_inputs
