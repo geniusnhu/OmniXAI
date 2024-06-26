@@ -25,11 +25,12 @@ def _calculate_integral(inp, baseline, gradients):
 
 
 class _IntegratedGradientTorch:
-    def __init__(self, model, embedding_layer):
+    def __init__(self, model, embedding_layer, huggingface_model):
         self.model = model
         self.embedding_layer = embedding_layer
         self.embeddings = None
         self.embedding_layer_inputs = None
+        self.huggingface_model = huggingface_model
 
     def compute_integrated_gradients(
         self, inputs, output_index, additional_inputs=None, steps=50, batch_size=8
@@ -66,7 +67,10 @@ class _IntegratedGradientTorch:
                 repeated_inputs = self._repeat(all_inputs, num_reps=self.embedding_layer_inputs.shape[0])
 
                 # Compute gradients
-                predictions = self.model(*repeated_inputs)
+                if self.huggingface_model:
+                    predictions = self.model(*repeated_inputs).logits
+                else:
+                    predictions = self.model(*repeated_inputs)
                 if len(predictions.shape) > 1:
                     assert output_index is not None, "The model has multiple outputs, the output index cannot be None"
                     predictions = predictions[:, output_index]
@@ -82,7 +86,10 @@ class _IntegratedGradientTorch:
         return _calculate_integral(self.embeddings[0], baselines[0], gradients)
 
     def _embedding_hook(self, module, inputs, outputs):
-        self.embeddings = outputs.detach().cpu().numpy()
+        if self.huggingface_model:
+            self.embeddings = outputs.logits.detach().cpu().numpy()
+        else:
+            self.embeddings = outputs.detach().cpu().numpy()
 
     def _embedding_layer_hook(self, module, inputs, outputs):
         return self.embedding_layer_inputs
@@ -187,6 +194,7 @@ class IntegratedGradientText(ExplainerBase):
             mode: str = "classification",
             id2token: Dict = None,
             tokenizer: Callable = None,
+            huggingface_model: Bool = False,
             **kwargs,
     ):
         """
@@ -199,6 +207,7 @@ class IntegratedGradientText(ExplainerBase):
         :param mode: The task type, e.g., `classification` or `regression`.
         :param id2token: The mapping from token ids to tokens. If `tokenizer` is set, `id2token` will be ignored.
         :param tokenizer: The tokenizer for processing text inputs, i.e., tokenizers in HuggingFace.
+        :param huggingface_model: whether this is huggingface model or not
         """
         super().__init__()
         assert preprocess_function is not None, (
@@ -210,6 +219,7 @@ class IntegratedGradientText(ExplainerBase):
         self.preprocess_function = preprocess_function
         self.id2token = id2token
         self.tokenizer = tokenizer
+        self.huggingface_model = huggingface_model
 
         ig_class = None
         if is_torch_available():
@@ -226,7 +236,7 @@ class IntegratedGradientText(ExplainerBase):
                 self.model_type = "tf"
         if ig_class is None:
             raise ValueError(f"`model` should be a tf.keras.Model " f"or a torch.nn.Module instead of {type(model)}")
-        self.ig_model = ig_class(self.model, self.embedding_layer)
+        self.ig_model = ig_class(self.model, self.embedding_layer, self.huggingface_model)
 
     def _preprocess(self, X: Text):
         inputs = self.preprocess_function(X)
@@ -279,15 +289,15 @@ class IntegratedGradientText(ExplainerBase):
                         f"should be the same as the number of images in X."
                     )
             else:
-                try:
+                if huggingface_model:
                     scores = (
-                        self.model(*inputs).detach().cpu().numpy()
+                        self.model(*inputs).logits.detach().cpu().numpy()
                         if self.model_type == "torch"
                         else self.model(*inputs).numpy()
                     )
-                except:
+                else:
                     scores = (
-                        self.model(*inputs).logits.detach().cpu().numpy()
+                        self.model(*inputs).detach().cpu().numpy()
                         if self.model_type == "torch"
                         else self.model(*inputs).numpy()
                     )
