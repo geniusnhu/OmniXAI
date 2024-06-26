@@ -279,11 +279,18 @@ class IntegratedGradientText(ExplainerBase):
                         f"should be the same as the number of images in X."
                     )
             else:
-                scores = (
-                    self.model(*inputs).detach().cpu().numpy()
-                    if self.model_type == "torch"
-                    else self.model(*inputs).numpy()
-                )
+                try:
+                    scores = (
+                        self.model(*inputs).detach().cpu().numpy()
+                        if self.model_type == "torch"
+                        else self.model(*inputs).numpy()
+                    )
+                except:
+                    scores = (
+                        self.model(*inputs).logits.detach().cpu().numpy()
+                        if self.model_type == "torch"
+                        else self.model(*inputs).numpy()
+                    )
                 y = np.argmax(scores, axis=1).astype(int)
 
         for i, instance in enumerate(X):
