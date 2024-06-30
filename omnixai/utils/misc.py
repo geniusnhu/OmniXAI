@@ -165,7 +165,10 @@ def tensor_to_numpy(x):
         return np.array([x])
     if not isinstance(x, np.ndarray):
         try:
-            x = x.detach().cpu().numpy()
+            try:
+                x = x.detach().cpu().numpy()
+            except:
+                x = x.logits.detach().cpu().numpy()
         except:
             x = x.numpy()
     return x
